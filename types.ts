@@ -29,6 +29,24 @@ export interface AnalysisResult {
   changes: ChangeItem[];
 }
 
+export interface Folder {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
+export interface SmartDocument {
+  id: string;
+  folderId: string | null; // null if in root
+  title: string;
+  v1: string;
+  v2: string;
+  patchText: string;
+  mode: AppMode;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface DocumentState {
   v1: string;
   v2: string;
@@ -50,6 +68,7 @@ export interface PatchPlan {
 
 export interface HistoryRecord {
   id: string;
+  docId?: string; // Link to specific document
   timestamp: number; // Unix timestamp
   version: string;
   summary: string;

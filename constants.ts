@@ -129,6 +129,25 @@ export const TRANSLATIONS = {
     opInsert: "插入内容",
     opReplace: "替换内容",
     opDelete: "删除内容",
+
+    // History
+    btnHistoryClear: "清空历史",
+    historySearchPlaceholder: "搜索历史记录...",
+    historyFilterCurrent: "只显示当前文档",
+    historyConfirmClear: "确定要清空所有历史记录吗？此操作无法撤销。",
+
+    // File Explorer
+    fileExplorerTitle: "资源管理器",
+    feNewFolder: "新建项目",
+    feNewFile: "新建文档",
+    feUntitledDoc: "未命名文档",
+    feUntitledFolder: "未命名项目",
+    feRename: "重命名",
+    feDelete: "删除",
+    feDeleteFolderConfirm: "确定要删除此项目及其包含的所有文档吗？",
+    feDeleteFileConfirm: "确定要删除此文档吗？",
+    feEmpty: "暂无文件，请新建。",
+    feDefaultProject: "默认项目"
   },
   en: {
     appTitle: "SmartDiff",
@@ -194,5 +213,24 @@ export const TRANSLATIONS = {
     opInsert: "Insert",
     opReplace: "Replace",
     opDelete: "Delete",
+
+    // History
+    btnHistoryClear: "Clear History",
+    historySearchPlaceholder: "Search history...",
+    historyFilterCurrent: "Filter by current doc",
+    historyConfirmClear: "Are you sure you want to clear all history? This cannot be undone.",
+
+    // File Explorer
+    fileExplorerTitle: "Explorer",
+    feNewFolder: "New Project",
+    feNewFile: "New Doc",
+    feUntitledDoc: "Untitled Doc",
+    feUntitledFolder: "Untitled Project",
+    feRename: "Rename",
+    feDelete: "Delete",
+    feDeleteFolderConfirm: "Are you sure you want to delete this project and all its documents?",
+    feDeleteFileConfirm: "Are you sure you want to delete this document?",
+    feEmpty: "No files yet.",
+    feDefaultProject: "Default Project"
   }
 };
