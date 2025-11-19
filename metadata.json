@@ -1,0 +1,5 @@
+{
+  "name": "SmartDiff",
+  "description": "AI-powered automated document version management and semantic diff visualization.",
+  "requestFramePermissions": []
+}
