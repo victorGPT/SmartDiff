@@ -1,7 +1,7 @@
 import React from 'react';
 import { AnalysisResult, ChangeType, Language } from '../types';
 import { TYPE_COLORS, TRANSLATIONS } from '../constants';
-import { ArrowUpCircle, CheckCircle2, FileText, Code, Terminal, Sparkles } from 'lucide-react';
+import { ArrowUpCircle, CheckCircle2, FileText, Code, Terminal, Sparkles, Cpu } from 'lucide-react';
 
 interface SidebarProps {
   result: AnalysisResult;
@@ -40,9 +40,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ result, activeChangeId, onSele
               {result.bumpType}
             </span>
           </div>
-          <p className="text-sm text-slate-600 leading-relaxed font-medium">
+          <p className="text-sm text-slate-600 leading-relaxed font-medium mb-4">
             {result.summary}
           </p>
+          
+          {/* Token Usage Badge */}
+          {result.usage && (
+            <div className="flex items-center justify-end pt-3 border-t border-slate-50">
+               <div className="flex items-center text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-1 rounded-md">
+                 <Cpu className="w-3 h-3 mr-1.5 text-slate-400" />
+                 <span>{result.usage.totalTokens} Tokens</span>
+               </div>
+            </div>
+          )}
         </div>
       </div>
 

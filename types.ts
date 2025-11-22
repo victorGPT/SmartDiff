@@ -10,6 +10,12 @@ export enum ChangeType {
 export type Language = 'zh' | 'en';
 export type AppMode = 'global' | 'patch';
 
+export interface TokenUsage {
+  promptTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
+
 export interface ChangeItem {
   id: string;
   type: ChangeType;
@@ -27,6 +33,7 @@ export interface AnalysisResult {
   bumpType: 'Major' | 'Minor' | 'Patch';
   summary: string;
   changes: ChangeItem[];
+  usage?: TokenUsage;
 }
 
 export interface Folder {
@@ -64,6 +71,7 @@ export interface PatchPlan {
   proposedVersion: string;
   bumpType: 'Major' | 'Minor' | 'Patch';
   summary: string;
+  usage?: TokenUsage;
 }
 
 export interface HistoryRecord {

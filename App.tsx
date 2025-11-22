@@ -7,10 +7,11 @@ import { JsonModal } from './components/JsonModal';
 import { PatchPreviewModal } from './components/PatchPreviewModal';
 import { HistoryModal } from './components/HistoryModal';
 import { FileExplorer } from './components/FileExplorer';
+import { ShareModal } from './components/ShareModal';
 import { analyzeDiff, createPatchPlan, generatePatchedDocument } from './services/geminiService';
 import { AnalysisResult, Language, AppMode, PatchPlan, HistoryRecord, Folder, SmartDocument } from './types';
-import { SAMPLE_V1, SAMPLE_V2, CHANGE_TYPE_DESCRIPTIONS, TRANSLATIONS } from './constants';
-import { Sparkles, Play, Code2, RotateCcw, SplitSquareHorizontal, Eye, Download, Languages, FileInput, FileText, Clock, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { SAMPLE_V1, SAMPLE_V2, CHANGE_TYPE_DESCRIPTIONS, TRANSLATIONS, HISTORY_MARKER, AI_GUIDE_COMMENT } from './constants';
+import { Sparkles, Play, Code2, RotateCcw, SplitSquareHorizontal, Eye, Download, Languages, FileInput, FileText, Clock, Menu, PanelLeftClose, PanelLeftOpen, Share2 } from 'lucide-react';
 
 // Helper for ID generation
 const generateId = () => Math.random().toString(36).substring(2, 11);
@@ -31,6 +32,7 @@ const App: React.FC = () => {
   const [patchPlan, setPatchPlan] = useState<PatchPlan | null>(null);
   const [showPatchPreview, setShowPatchPreview] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   
   const [activeChangeId, setActiveChangeId] = useState<string | null>(null);
   const [highlightLines, setHighlightLines] = useState<{ start: number; end: number } | null>(null);
@@ -40,6 +42,7 @@ const App: React.FC = () => {
   // View Mode: 'edit' (default/source), 'diff' (comparison), 'preview' (markdown)
   const [viewMode, setViewMode] = useState<'edit' | 'diff' | 'preview'>('edit');
   const [lang, setLang] = useState<Language>('zh');
+  const [docHistory, setDocHistory] = useState<HistoryRecord[]>([]);
 
   const t = TRANSLATIONS[lang];
 
@@ -96,6 +99,30 @@ const App: React.FC = () => {
       localStorage.setItem('smartdiff_active_id', activeDocId);
     }
   }, [folders, documents, activeDocId]);
+
+  // Load and filter history when sharing
+  useEffect(() => {
+    if (showShare) {
+      try {
+        const stored = localStorage.getItem('smartdiff_history');
+        if (stored) {
+          const allHistory = JSON.parse(stored) as HistoryRecord[];
+          // Filter by docId if present, or try matching title if docId is missing (legacy support)
+          const filtered = allHistory.filter(r => {
+             if (activeDocId && r.docId === activeDocId) return true;
+             if (!r.docId && activeDoc && r.docTitle === activeDoc.title) return true;
+             return false;
+          });
+          setDocHistory(filtered);
+        } else {
+          setDocHistory([]);
+        }
+      } catch (e) {
+        console.error("Error loading history for share", e);
+        setDocHistory([]);
+      }
+    }
+  }, [showShare, activeDocId, activeDoc?.title]);
 
 
   // --- File System Handlers ---
@@ -177,14 +204,47 @@ const App: React.FC = () => {
 
   const stripMetadata = (text: string): string => {
     if (!text) return '';
-    const markerIndex = text.indexOf('SMARTDIFF AI METADATA');
+    // Try new robust marker
+    const markerIndex = text.indexOf(HISTORY_MARKER);
     if (markerIndex !== -1) {
+      return text.substring(0, markerIndex).trim();
+    }
+    // Fallback for legacy metadata
+    const markerIndexLegacy = text.indexOf('SMARTDIFF AI METADATA');
+    if (markerIndexLegacy !== -1) {
        const split = text.split(/<!--\s*=+\s*SMARTDIFF AI METADATA/);
        if (split.length > 1) {
          return split[0].replace(/(<br\s*\/?>\s*)?(<hr\s*\/?>\s*)?$/i, '').trim();
        }
     }
     return text;
+  };
+
+  const extractHistory = (text: string): string => {
+    if (!text) return '';
+    const markerIndex = text.indexOf(HISTORY_MARKER);
+    if (markerIndex !== -1) {
+      return text.substring(markerIndex + HISTORY_MARKER.length).trim();
+    }
+    return '';
+  };
+
+  // Inject invisible AI guide comment after title
+  const ensureAiGuide = (text: string): string => {
+    if (!text) return '';
+    if (text.includes(AI_GUIDE_COMMENT)) return text;
+
+    const lines = text.split('\n');
+    const h1Index = lines.findIndex(line => line.trim().startsWith('# '));
+    
+    if (h1Index !== -1) {
+      // Insert after H1
+      lines.splice(h1Index + 1, 0, "", AI_GUIDE_COMMENT, "");
+      return lines.join('\n');
+    } else {
+      // Insert at top if no H1
+      return `${AI_GUIDE_COMMENT}\n\n${text}`;
+    }
   };
 
   const saveToHistory = (analysis: AnalysisResult, content: string, title: string) => {
@@ -296,14 +356,35 @@ const App: React.FC = () => {
     setIsPatchGenerating(true);
     try {
       const cleanV1ForGen = stripMetadata(activeDoc.v1);
+      // Get existing history to carry over
+      const inheritedHistory = extractHistory(activeDoc.v1);
       
-      const newV2 = await generatePatchedDocument(cleanV1ForGen, activeDoc.patchText, patchPlan, targetVersion, lang);
-      updateActiveDoc({ v2: newV2 });
+      // Generate returns { text, usage }
+      const { text: newV2, usage: generationUsage } = await generatePatchedDocument(cleanV1ForGen, activeDoc.patchText, patchPlan, targetVersion, lang);
 
-      const cleanV2 = stripMetadata(newV2); 
+      // Ensure AI Guide is present in the raw generated text
+      const v2WithGuide = ensureAiGuide(newV2);
+      const cleanV2 = stripMetadata(v2WithGuide); 
+      
       const analysis = await analyzeDiff(cleanV1ForGen, cleanV2, lang, targetVersion);
+      
       setResult(analysis);
       saveToHistory(analysis, cleanV2, activeDoc.title);
+      
+      // --- STACKING HISTORY LOGIC ---
+      // Construct the new history entry block
+      const timestamp = new Date().toLocaleString();
+      const newHistoryEntry = `
+### v${analysis.version} (${timestamp})
+${analysis.summary}
+\`\`\`json
+${JSON.stringify(analysis, null, 2)}
+\`\`\`
+`;
+      // Stack: New Content + Marker + Old History + New History Entry
+      const fullV2 = `${cleanV2}\n\n<br/>\n<hr/>\n\n${HISTORY_MARKER}\n\n${inheritedHistory ? inheritedHistory + '\n\n' : ''}${newHistoryEntry}`;
+      
+      updateActiveDoc({ v2: fullV2 });
       
       setShowPatchPreview(false);
       setStep('result');
@@ -359,22 +440,15 @@ const App: React.FC = () => {
 
     const noteText = `> **${t.exportNote}**: ${t.exportNoteContent}`;
     const cleanV2 = stripMetadata(activeDoc.v2);
-    let contentWithNote = cleanV2;
-    const lines = cleanV2.split('\n');
-    const h1Index = lines.findIndex(line => line.trim().startsWith('# '));
-
-    if (h1Index !== -1) {
-      lines.splice(h1Index + 1, 0, "", noteText, "");
-      contentWithNote = lines.join('\n');
-    } else {
-      contentWithNote = `${noteText}\n\n${cleanV2}`;
-    }
-
-    const exportContent = `${contentWithNote}
-
-<br/>
-<hr/>
-
+    
+    // Ensure AI Guide
+    const contentWithGuide = ensureAiGuide(cleanV2);
+    
+    // Get any existing history present in V2 (e.g. if user is in Patch mode, V2 has stacked history)
+    const existingHistory = extractHistory(activeDoc.v2);
+    
+    // Prepare current analysis block
+    const currentAnalysisBlock = `
 <!-- 
 =============================================================================
 ${t.exportMetaHeader}
@@ -384,10 +458,39 @@ Generated at: ${humanTime}
 
 ${legendText}
 
-### ${t.exportSectionTitle}
+### ${t.exportSectionTitle} (v${result.version})
 \`\`\`json
 ${JSON.stringify(result, null, 2)}
 \`\`\`
+`;
+
+    let contentWithNote = contentWithGuide;
+    const lines = contentWithGuide.split('\n');
+    const h1Index = lines.findIndex(line => line.trim().startsWith('# '));
+
+    if (h1Index !== -1) {
+      lines.splice(h1Index + 1, 0, "", noteText, "");
+      contentWithNote = lines.join('\n');
+    } else {
+      contentWithNote = `${noteText}\n\n${contentWithGuide}`;
+    }
+
+    // Only append current analysis if it's not already in the existing history
+    // Simple check: look for the specific version string in the history block
+    const alreadyContainsAnalysis = existingHistory.includes(`"version": "${result.version}"`);
+    
+    const finalHistoryBlock = existingHistory 
+        ? (alreadyContainsAnalysis ? existingHistory : `${existingHistory}\n\n${currentAnalysisBlock}`)
+        : currentAnalysisBlock;
+
+    const exportContent = `${contentWithNote}
+
+<br/>
+<hr/>
+
+${HISTORY_MARKER}
+
+${finalHistoryBlock}
 `;
 
     const blob = new Blob([exportContent], { type: 'text/markdown;charset=utf-8;' });
@@ -505,6 +608,7 @@ ${JSON.stringify(result, null, 2)}
                 
                 <div className="w-px h-4 bg-slate-300 mx-1"></div>
                 
+                <Button variant="ghost" onClick={() => setShowShare(true)} icon={<Share2 className="w-4 h-4"/>} className="rounded-full px-3" title={t.btnShare} />
                 <Button variant="ghost" onClick={handleExport} icon={<Download className="w-4 h-4"/>} className="rounded-full px-3" title={t.btnExport} />
                 <Button variant="ghost" onClick={() => setShowJson(true)} icon={<FileText className="w-4 h-4"/>} className="rounded-full px-3" title="JSON" />
                 <Button variant="ghost" onClick={handleReset} icon={<RotateCcw className="w-4 h-4"/>} className="rounded-full px-3 text-slate-400 hover:text-red-600" title={t.btnReset} />
@@ -591,8 +695,8 @@ ${JSON.stringify(result, null, 2)}
               {/* Main View (Document Preview) */}
               <div className="flex-1 h-full flex flex-col relative z-10 overflow-hidden rounded-3xl shadow-xl ring-1 ring-black/5">
                 <DocumentView 
-                  v1Content={activeDoc?.v1 || ''}
-                  v2Content={activeDoc?.v2 || ''}
+                  v1Content={stripMetadata(activeDoc?.v1 || '')}
+                  v2Content={stripMetadata(activeDoc?.v2 || '')}
                   activeChangeId={activeChangeId} 
                   highlightLines={highlightLines}
                   viewMode={viewMode}
@@ -619,6 +723,15 @@ ${JSON.stringify(result, null, 2)}
           onRestore={handleRestore}
           lang={lang}
           currentDocTitle={activeDoc?.title}
+        />
+
+        <ShareModal 
+          isOpen={showShare}
+          onClose={() => setShowShare(false)}
+          result={result}
+          doc={activeDoc}
+          history={docHistory}
+          lang={lang}
         />
 
         {result && (

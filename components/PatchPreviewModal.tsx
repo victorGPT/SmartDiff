@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Target, BrainCircuit, CheckCircle2, ListChecks, Edit3, Sparkles as SparklesIcon } from 'lucide-react';
+import { X, Target, BrainCircuit, CheckCircle2, ListChecks, Edit3, Sparkles as SparklesIcon, Cpu } from 'lucide-react';
 import { PatchPlan, Language } from '../types';
 import { TRANSLATIONS } from '../constants';
 import { Button } from './Button';
@@ -122,18 +122,26 @@ export const PatchPreviewModal: React.FC<PatchPreviewModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-6 bg-white border-t border-slate-100 flex justify-end space-x-4 flex-shrink-0">
-          <Button variant="ghost" onClick={onClose} disabled={isGenerating} className="text-slate-500">
-            {t.btnCancel}
-          </Button>
-          <Button 
-            onClick={() => onConfirm(versionInput)} 
-            isLoading={isGenerating}
-            className="bg-[#0071e3] hover:bg-[#0077ED] text-white px-8"
-            icon={<CheckCircle2 className="w-4 h-4"/>}
-          >
-            {t.btnConfirmPatch}
-          </Button>
+        <div className="p-6 bg-white border-t border-slate-100 flex justify-between items-center flex-shrink-0">
+           {/* Token Info */}
+           <div className="hidden sm:flex items-center text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-1 rounded-md">
+              <Cpu className="w-3 h-3 mr-1.5 text-slate-400" />
+              <span>{plan.usage?.totalTokens || 0} Tokens</span>
+           </div>
+
+          <div className="flex space-x-4 ml-auto">
+            <Button variant="ghost" onClick={onClose} disabled={isGenerating} className="text-slate-500">
+              {t.btnCancel}
+            </Button>
+            <Button 
+              onClick={() => onConfirm(versionInput)} 
+              isLoading={isGenerating}
+              className="bg-[#0071e3] hover:bg-[#0077ED] text-white px-8"
+              icon={<CheckCircle2 className="w-4 h-4"/>}
+            >
+              {t.btnConfirmPatch}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

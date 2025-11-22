@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { AnalysisResult, Language, PatchPlan } from "../types";
+import { AnalysisResult, Language, PatchPlan, TokenUsage } from "../types";
 import { TRANSLATIONS } from "../constants";
 
 // Initialize the client
@@ -98,7 +98,19 @@ export const analyzeDiff = async (v1Text: string, v2Text: string, lang: Language
     if (!text) {
         throw new Error("No response from AI");
     }
-    return JSON.parse(text) as AnalysisResult;
+    
+    const result = JSON.parse(text) as AnalysisResult;
+    
+    // Attach token usage if available
+    if (response.usageMetadata) {
+      result.usage = {
+        promptTokens: response.usageMetadata.promptTokenCount || 0,
+        outputTokens: response.usageMetadata.candidatesTokenCount || 0,
+        totalTokens: response.usageMetadata.totalTokenCount || 0
+      };
+    }
+    
+    return result;
 
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
@@ -167,7 +179,18 @@ export const createPatchPlan = async (v1Text: string, patchFragment: string, lan
 
   const text = response.text;
   if (!text) throw new Error("No plan generated");
-  return JSON.parse(text) as PatchPlan;
+  
+  const plan = JSON.parse(text) as PatchPlan;
+
+  if (response.usageMetadata) {
+    plan.usage = {
+      promptTokens: response.usageMetadata.promptTokenCount || 0,
+      outputTokens: response.usageMetadata.candidatesTokenCount || 0,
+      totalTokens: response.usageMetadata.totalTokenCount || 0
+    };
+  }
+
+  return plan;
 };
 
 /**
@@ -179,7 +202,7 @@ export const generatePatchedDocument = async (
   plan: PatchPlan, 
   targetVersion: string,
   lang: Language
-): Promise<string> => {
+): Promise<{ text: string, usage?: TokenUsage }> => {
   const today = new Date().toISOString().split('T')[0];
   
   // Convert actions array to string for prompt
@@ -196,12 +219,17 @@ export const generatePatchedDocument = async (
     1. **Principle of Least Change**: ONLY modify the sections identified in the plan. Do NOT rephrase other sections.
     2. **Structure**: Keep the original Markdown structure, indentation, and formatting.
     3. **Flow**: Ensure the inserted/replaced text flows naturally with the surrounding context.
-    4. **Version & Date**: 
-       - Find the version number in the document (e.g., headers, title, metadata) and UPDATE it to: "${targetVersion}".
-       - Update any existing date/timestamp to "${today}".
-       - If no version/date exists, insert them in a blockquote after the main title.
     
-    5. **METADATA REMOVAL (CRITICAL)**:
+    4. **Version & Date Header REPLACEMENT RULE (CRITICAL)**:
+       - Scan the document for an existing header block containing "Version" and "Date" info.
+       - **ACTION**: You MUST REPLACE the existing version/date values in-place with the new ones: Version: "${targetVersion}", Date: "${today}".
+       - **Standard Format**: If updating/inserting, prefer this format:
+         > **Version**: ${targetVersion} | **Last Updated**: ${today}
+       - **FORBIDDEN**: Do NOT create a second/duplicate header block. Do NOT append a new header if one already exists.
+       - **CLEANUP**: If you find multiple old version headers, REMOVE all of them except the one you just updated at the top.
+       - **GOAL**: The output document must contain EXACTLY ONE version identifier.
+    
+    5. **METADATA REMOVAL**:
        - Check if the V1 Document ends with a block containing "SMARTDIFF AI METADATA" or a JSON code block describing the previous version.
        - If found, **REMOVE IT COMPLETELY**. 
        - Do NOT reproduce the old JSON metadata in the output. 
@@ -232,5 +260,16 @@ export const generatePatchedDocument = async (
   if (!text) throw new Error("Failed to generate document");
   
   // Clean up if the model wrapped it in ```markdown
-  return text.replace(/^```markdown\n/, '').replace(/^```\n/, '').replace(/\n```$/, '');
+  const cleanText = text.replace(/^```markdown\n/, '').replace(/^```\n/, '').replace(/\n```$/, '');
+
+  let usage: TokenUsage | undefined;
+  if (response.usageMetadata) {
+    usage = {
+      promptTokens: response.usageMetadata.promptTokenCount || 0,
+      outputTokens: response.usageMetadata.candidatesTokenCount || 0,
+      totalTokens: response.usageMetadata.totalTokenCount || 0
+    };
+  }
+
+  return { text: cleanText, usage };
 };

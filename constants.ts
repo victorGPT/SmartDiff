@@ -64,11 +64,17 @@ export const CHANGE_TYPE_DESCRIPTIONS: Record<Language, Record<string, string>> 
   }
 };
 
+// Used to separate document content from appended history logs
+export const HISTORY_MARKER = "<!-- 🛡️ SMARTDIFF HISTORY LOG 🛡️ -->";
+
+// Invisible guide for AI IDEs (Cursor/Copilot) to find structured data
+export const AI_GUIDE_COMMENT = '<!-- 🤖 SMARTDIFF_AI_GUIDE: For structured changes and version history, refer to the "Analysis JSON" section at the end of this file. -->';
+
 export const TRANSLATIONS = {
   zh: {
-    appTitle: "SmartDiff",
+    appTitle: "AI 自动化文档版本管理",
     beta: "Beta",
-    inputModeTitle: "AI 语义版本管理",
+    inputModeTitle: "AI 自动化文档版本管理",
     inputModeDesc: "SmartDiff 使用 AI 识别语义变更，生成更新日志，并自动计算版本号。",
     labelV1: "旧版本 (V1)",
     placeholderV1: "在此粘贴原始文档...",
@@ -82,6 +88,7 @@ export const TRANSLATIONS = {
     btnPreview: "预览",
     btnEdit: "源码",
     btnExport: "导出",
+    btnShare: "分享",
     btnReset: "重置",
     btnLoadDemo: "加载示例",
     btnHistory: "历史记录",
@@ -109,6 +116,7 @@ export const TRANSLATIONS = {
     jsonCopy: "复制",
     jsonCopied: "已复制",
     analysisPromptLang: "Simplified Chinese",
+    tokenUsage: "Token 消耗",
     
     // Smart Patch specific
     modeGlobal: "全局更新",
@@ -147,12 +155,22 @@ export const TRANSLATIONS = {
     feDeleteFolderConfirm: "确定要删除此项目及其包含的所有文档吗？",
     feDeleteFileConfirm: "确定要删除此文档吗？",
     feEmpty: "暂无文件，请新建。",
-    feDefaultProject: "默认项目"
+    feDefaultProject: "默认项目",
+
+    // Share
+    shareModalTitle: "分享中心",
+    shareTabSummary: "研发群通知",
+    shareTabHtml: "交互式离线报告",
+    shareSummaryDesc: "复制简洁的摘要，适合发送到 Slack、钉钉或 PR 描述。",
+    shareHtmlDesc: "生成包含完整版本历史的单文件应用。支持离线查看任意版本对比。",
+    btnCopySummary: "复制摘要",
+    btnDownloadHtml: "下载 HTML 应用",
+    summaryCopied: "已复制！"
   },
   en: {
-    appTitle: "SmartDiff",
+    appTitle: "AI Automated Document Version Management",
     beta: "Beta",
-    inputModeTitle: "AI Semantic Versioning",
+    inputModeTitle: "AI Automated Document Version Management",
     inputModeDesc: "SmartDiff uses AI to identify semantic changes, generate changelogs, and automatically calculate version numbers.",
     labelV1: "Original (V1)",
     placeholderV1: "Paste original document here...",
@@ -166,6 +184,7 @@ export const TRANSLATIONS = {
     btnPreview: "Preview",
     btnEdit: "Source",
     btnExport: "Export",
+    btnShare: "Share",
     btnReset: "Reset",
     btnLoadDemo: "Load Demo",
     btnHistory: "History",
@@ -193,6 +212,7 @@ export const TRANSLATIONS = {
     jsonCopy: "Copy",
     jsonCopied: "Copied",
     analysisPromptLang: "English",
+    tokenUsage: "Token Usage",
 
     // Smart Patch specific
     modeGlobal: "Global Update",
@@ -231,6 +251,16 @@ export const TRANSLATIONS = {
     feDeleteFolderConfirm: "Are you sure you want to delete this project and all its documents?",
     feDeleteFileConfirm: "Are you sure you want to delete this document?",
     feEmpty: "No files yet.",
-    feDefaultProject: "Default Project"
+    feDefaultProject: "Default Project",
+
+    // Share
+    shareModalTitle: "Share Center",
+    shareTabSummary: "Team Update",
+    shareTabHtml: "Interactive Report",
+    shareSummaryDesc: "Formatted summary for Chat apps or PR descriptions.",
+    shareHtmlDesc: "Generate a standalone Single Page App. Interactive history and diffing.",
+    btnCopySummary: "Copy Summary",
+    btnDownloadHtml: "Download HTML App",
+    summaryCopied: "Copied!"
   }
 };
