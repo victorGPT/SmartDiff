@@ -1,7 +1,7 @@
 import React from 'react';
-import { Language, AppMode } from '../types';
+import { Language, AppMode, AnalysisPersona } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Layers, Sparkles, FileText } from 'lucide-react';
+import { Layers, Sparkles, FileText, Users } from 'lucide-react';
 
 interface InputSectionProps {
   docTitle: string;
@@ -16,6 +16,8 @@ interface InputSectionProps {
   lang: Language;
   mode: AppMode;
   onModeChange: (mode: AppMode) => void;
+  persona: AnalysisPersona;
+  onPersonaChange: (p: AnalysisPersona) => void;
 }
 
 export const InputSection: React.FC<InputSectionProps> = ({ 
@@ -30,7 +32,9 @@ export const InputSection: React.FC<InputSectionProps> = ({
   isAnalyzing, 
   lang,
   mode,
-  onModeChange
+  onModeChange,
+  persona,
+  onPersonaChange
 }) => {
   const t = TRANSLATIONS[lang];
   
@@ -40,31 +44,54 @@ export const InputSection: React.FC<InputSectionProps> = ({
       {/* Header Row: Mode Switcher and Title Input */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-6 flex-shrink-0">
         
-        {/* iOS Segmented Control */}
-        <div className="bg-slate-200/60 p-1 rounded-lg inline-flex relative shadow-inner flex-shrink-0 self-start md:self-auto">
-          <div 
-             className={`absolute top-1 bottom-1 rounded-md bg-white shadow-sm transition-all duration-300 ease-out
-               ${mode === 'global' ? 'left-1 w-[calc(50%-4px)]' : 'left-[calc(50%+0px)] w-[calc(50%-4px)]'}
-             `}
-          ></div>
-          <button
-            onClick={() => onModeChange('global')}
-            disabled={isAnalyzing}
-            className={`relative px-6 py-1.5 text-sm font-medium rounded-md z-10 transition-colors flex items-center justify-center
-              ${mode === 'global' ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            <Layers className="w-4 h-4 mr-2" />
-            {t.modeGlobal}
-          </button>
-          <button
-            onClick={() => onModeChange('patch')}
-            disabled={isAnalyzing}
-            className={`relative px-6 py-1.5 text-sm font-medium rounded-md z-10 transition-colors flex items-center justify-center
-              ${mode === 'patch' ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            <Sparkles className="w-4 h-4 mr-2" />
-            {t.modePatch}
-          </button>
+        {/* iOS Segmented Control & Persona Group */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="bg-slate-200/60 p-1 rounded-lg inline-flex relative shadow-inner flex-shrink-0 self-start md:self-auto">
+            <div 
+              className={`absolute top-1 bottom-1 rounded-md bg-white shadow-sm transition-all duration-300 ease-out
+                ${mode === 'global' ? 'left-1 w-[calc(50%-4px)]' : 'left-[calc(50%+0px)] w-[calc(50%-4px)]'}
+              `}
+            ></div>
+            <button
+              onClick={() => onModeChange('global')}
+              disabled={isAnalyzing}
+              className={`relative px-6 py-1.5 text-sm font-medium rounded-md z-10 transition-colors flex items-center justify-center
+                ${mode === 'global' ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <Layers className="w-4 h-4 mr-2" />
+              {t.modeGlobal}
+            </button>
+            <button
+              onClick={() => onModeChange('patch')}
+              disabled={isAnalyzing}
+              className={`relative px-6 py-1.5 text-sm font-medium rounded-md z-10 transition-colors flex items-center justify-center
+                ${mode === 'patch' ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              {t.modePatch}
+            </button>
+          </div>
+
+          {/* Persona Selector */}
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Users className="h-4 w-4 text-slate-400 group-focus-within:text-[#0071e3] transition-colors" />
+            </div>
+            <select
+              value={persona}
+              onChange={(e) => onPersonaChange(e.target.value as AnalysisPersona)}
+              className="block w-full sm:w-48 pl-10 pr-8 py-2 border-0 bg-white rounded-lg text-sm text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-[#0071e3] cursor-pointer outline-none appearance-none font-medium h-full"
+              disabled={isAnalyzing}
+            >
+              <option value="general">{t.personaGeneral}</option>
+              <option value="developer">{t.personaDeveloper}</option>
+              <option value="executive">{t.personaExecutive}</option>
+              <option value="public">{t.personaPublic}</option>
+            </select>
+            <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-slate-400">
+               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+            </div>
+          </div>
         </div>
 
         {/* Document Title Input */}

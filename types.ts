@@ -10,6 +10,9 @@ export enum ChangeType {
 export type Language = 'zh' | 'en';
 export type AppMode = 'global' | 'patch';
 
+// New: Define target audience for the analysis
+export type AnalysisPersona = 'general' | 'developer' | 'executive' | 'public';
+
 export interface TokenUsage {
   promptTokens: number;
   outputTokens: number;
@@ -28,7 +31,7 @@ export interface ChangeItem {
 }
 
 export interface AnalysisResult {
-  version: string; // The new calculated version
+  version: string; // The new calculated semantic version (e.g., 1.1.0)
   previousVersion: string;
   bumpType: 'Major' | 'Minor' | 'Patch';
   summary: string;
@@ -42,6 +45,13 @@ export interface Folder {
   createdAt: number;
 }
 
+export interface GithubConfig {
+  owner: string;
+  repo: string;
+  branch: string;
+  path: string;
+}
+
 export interface SmartDocument {
   id: string;
   folderId: string | null; // null if in root
@@ -50,8 +60,10 @@ export interface SmartDocument {
   v2: string;
   patchText: string;
   mode: AppMode;
+  persona: AnalysisPersona; // New: Save persona preference per doc
   createdAt: number;
   updatedAt: number;
+  githubConfig?: GithubConfig;
 }
 
 export interface DocumentState {

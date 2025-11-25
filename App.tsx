@@ -8,10 +8,12 @@ import { PatchPreviewModal } from './components/PatchPreviewModal';
 import { HistoryModal } from './components/HistoryModal';
 import { FileExplorer } from './components/FileExplorer';
 import { ShareModal } from './components/ShareModal';
+import { GithubModal } from './components/GithubModal';
 import { analyzeDiff, createPatchPlan, generatePatchedDocument } from './services/geminiService';
-import { AnalysisResult, Language, AppMode, PatchPlan, HistoryRecord, Folder, SmartDocument } from './types';
+import { fetchFileFromGithub, pushFileToGithub } from './services/githubService';
+import { AnalysisResult, Language, AppMode, PatchPlan, HistoryRecord, Folder, SmartDocument, GithubConfig, AnalysisPersona } from './types';
 import { SAMPLE_V1, SAMPLE_V2, CHANGE_TYPE_DESCRIPTIONS, TRANSLATIONS, HISTORY_MARKER, AI_GUIDE_COMMENT } from './constants';
-import { Sparkles, Play, Code2, RotateCcw, SplitSquareHorizontal, Eye, Download, Languages, FileInput, FileText, Clock, Menu, PanelLeftClose, PanelLeftOpen, Share2 } from 'lucide-react';
+import { Sparkles, Play, Code2, RotateCcw, SplitSquareHorizontal, Eye, Download, Languages, FileInput, FileText, Clock, Menu, PanelLeftClose, PanelLeftOpen, Share2, Github, CloudDownload, CloudUpload, CheckCircle2 } from 'lucide-react';
 
 // Helper for ID generation
 const generateId = () => Math.random().toString(36).substring(2, 11);
@@ -33,11 +35,14 @@ const App: React.FC = () => {
   const [showPatchPreview, setShowPatchPreview] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [showGithub, setShowGithub] = useState(false);
   
   const [activeChangeId, setActiveChangeId] = useState<string | null>(null);
   const [highlightLines, setHighlightLines] = useState<{ start: number; end: number } | null>(null);
   const [showJson, setShowJson] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   // View Mode: 'edit' (default/source), 'diff' (comparison), 'preview' (markdown)
   const [viewMode, setViewMode] = useState<'edit' | 'diff' | 'preview'>('edit');
@@ -79,6 +84,7 @@ const App: React.FC = () => {
         v2: localStorage.getItem('draft_v2') || '',
         patchText: localStorage.getItem('draft_patch') || '',
         mode: (localStorage.getItem('draft_mode') as AppMode) || 'global',
+        persona: 'general', // Default persona for migration
         createdAt: Date.now(),
         updatedAt: Date.now()
       };
@@ -124,7 +130,6 @@ const App: React.FC = () => {
     }
   }, [showShare, activeDocId, activeDoc?.title]);
 
-
   // --- File System Handlers ---
   const handleCreateFolder = () => {
     const newFolder: Folder = {
@@ -144,6 +149,7 @@ const App: React.FC = () => {
       v2: '',
       patchText: '',
       mode: 'global',
+      persona: 'general',
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
@@ -279,6 +285,91 @@ const App: React.FC = () => {
     setResult(null);
   };
 
+  // GitHub Handlers
+  const handleGithubSaveConfig = (token: string, config: GithubConfig) => {
+    updateActiveDoc({ githubConfig: config });
+  };
+
+  const handleGithubPull = async () => {
+    if (!activeDoc?.githubConfig) return;
+    const token = localStorage.getItem('smartdiff_gh_token');
+    if (!token) {
+      setShowGithub(true);
+      return;
+    }
+
+    if (!window.confirm(t.githubPullConfirm)) return;
+
+    setIsSyncing(true);
+    setSuccessMsg(null);
+    setError(null);
+    try {
+      const { owner, repo, path, branch } = activeDoc.githubConfig;
+      const { content } = await fetchFileFromGithub(token, owner, repo, path, branch);
+      updateActiveDoc({ v1: content, v2: '' });
+      setSuccessMsg(t.githubPullSuccess);
+      setStep('input');
+      setResult(null);
+    } catch (err) {
+      console.error(err);
+      setError(t.githubError);
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSuccessMsg(null), 3000);
+    }
+  };
+
+  const handleGithubPush = async () => {
+    if (!activeDoc?.githubConfig) return;
+    const token = localStorage.getItem('smartdiff_gh_token');
+    if (!token) {
+      setShowGithub(true);
+      return;
+    }
+
+    // Determine what to push: V2 if available (latest state with history), otherwise V1
+    const contentToPush = activeDoc.v2 && activeDoc.v2.trim() !== '' ? activeDoc.v2 : activeDoc.v1;
+    
+    if (!contentToPush) {
+        setError("Document is empty.");
+        return;
+    }
+
+    // SMART COMMIT MESSAGE GENERATION
+    // If we have an analysis result, use it to craft a professional semantic commit message
+    let defaultMessage = `docs: update ${activeDoc.title || 'document'} via SmartDiff`;
+    
+    if (result) {
+      // Format: docs: update to v1.1.0 - Added feature X, Fixed Y
+      const actionSummary = result.changes.length > 0 
+        ? result.changes.map(c => c.title).join(', ').slice(0, 50) + (result.changes.map(c => c.title).join(', ').length > 50 ? '...' : '')
+        : 'General updates';
+        
+      defaultMessage = `docs: update to v${result.version} - ${actionSummary}`;
+    }
+
+    // Allow user to edit the commit message
+    // Using default message as the default value in prompt
+    const userMessage = window.prompt(t.githubPushConfirm, defaultMessage);
+    if (userMessage === null) return; // Cancelled
+
+    setIsSyncing(true);
+    setSuccessMsg(null);
+    setError(null);
+    try {
+      const { owner, repo, path, branch } = activeDoc.githubConfig;
+      
+      await pushFileToGithub(token, owner, repo, path, branch, contentToPush, userMessage || defaultMessage);
+      setSuccessMsg(t.githubPushSuccess);
+    } catch (err) {
+      console.error(err);
+      setError(t.githubError);
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSuccessMsg(null), 3000);
+    }
+  };
+
   // Auto-detect title
   useEffect(() => {
     if (activeDoc && (!activeDoc.title || activeDoc.title === t.feUntitledDoc)) {
@@ -294,12 +385,14 @@ const App: React.FC = () => {
     updateActiveDoc({
       v1: SAMPLE_V1,
       v2: SAMPLE_V2,
-      title: 'SmartDiff 产品需求文档'
+      title: 'SmartDiff 产品需求文档',
+      persona: 'general'
     });
   };
 
   const handleAnalyze = useCallback(async () => {
     setError(null);
+    setSuccessMsg(null);
     if (!activeDoc) return;
     
     if (activeDoc.mode === 'global') {
@@ -313,7 +406,8 @@ const App: React.FC = () => {
         const cleanV1 = stripMetadata(activeDoc.v1);
         const cleanV2 = stripMetadata(activeDoc.v2);
 
-        const analysis = await analyzeDiff(cleanV1, cleanV2, lang);
+        // PASS PERSONA
+        const analysis = await analyzeDiff(cleanV1, cleanV2, lang, undefined, activeDoc.persona || 'general');
         setResult(analysis);
         setStep('result');
         saveToHistory(analysis, cleanV2, activeDoc.title);
@@ -366,7 +460,8 @@ const App: React.FC = () => {
       const v2WithGuide = ensureAiGuide(newV2);
       const cleanV2 = stripMetadata(v2WithGuide); 
       
-      const analysis = await analyzeDiff(cleanV1ForGen, cleanV2, lang, targetVersion);
+      // PASS PERSONA
+      const analysis = await analyzeDiff(cleanV1ForGen, cleanV2, lang, targetVersion, activeDoc.persona || 'general');
       
       setResult(analysis);
       saveToHistory(analysis, cleanV2, activeDoc.title);
@@ -553,6 +648,40 @@ ${finalHistoryBlock}
           </div>
           
           <div className="flex items-center space-x-4">
+             {/* GitHub Actions Group */}
+             {activeDocId && (
+               <div className="flex items-center space-x-1 bg-slate-100/50 p-1 rounded-full border border-slate-200/60 mr-2">
+                 <button 
+                   onClick={() => setShowGithub(true)} 
+                   className={`p-2 rounded-full transition-all ${activeDoc?.githubConfig ? 'text-slate-800 hover:bg-white hover:shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                   title={t.githubModalTitle}
+                 >
+                   <Github className="w-4 h-4" />
+                 </button>
+                 {activeDoc?.githubConfig && (
+                   <>
+                     <div className="w-px h-3 bg-slate-300 mx-1"></div>
+                     <button 
+                        onClick={handleGithubPull} 
+                        disabled={isSyncing}
+                        className="p-2 rounded-full text-slate-600 hover:bg-white hover:shadow-sm hover:text-[#0071e3] transition-all disabled:opacity-50"
+                        title={t.githubPull}
+                     >
+                        <CloudDownload className={`w-4 h-4 ${isSyncing ? 'animate-pulse' : ''}`} />
+                     </button>
+                     <button 
+                        onClick={handleGithubPush} 
+                        disabled={isSyncing}
+                        className="p-2 rounded-full text-slate-600 hover:bg-white hover:shadow-sm hover:text-[#0071e3] transition-all disabled:opacity-50"
+                        title={t.githubPush}
+                     >
+                        <CloudUpload className={`w-4 h-4 ${isSyncing ? 'animate-pulse' : ''}`} />
+                     </button>
+                   </>
+                 )}
+               </div>
+             )}
+
             <Button 
               variant="ghost" 
               onClick={toggleLanguage} 
@@ -640,11 +769,17 @@ ${finalHistoryBlock}
 
         {/* Content Canvas */}
         <main className="flex-1 relative overflow-hidden">
-          {/* Error Banner */}
+          {/* Messages */}
           {error && (
               <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-red-50/90 backdrop-blur-md text-red-600 px-6 py-3 rounded-full border border-red-200 shadow-[0_8px_30px_rgb(0,0,0,0.12)] z-50 flex items-center text-sm font-medium animate-in slide-in-from-top-4 fade-in duration-300">
                   <Sparkles className="w-4 h-4 mr-2" /> 
                   {error}
+              </div>
+          )}
+          {successMsg && (
+              <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-green-50/90 backdrop-blur-md text-green-700 px-6 py-3 rounded-full border border-green-200 shadow-[0_8px_30px_rgb(0,0,0,0.12)] z-50 flex items-center text-sm font-medium animate-in slide-in-from-top-4 fade-in duration-300">
+                  <CheckCircle2 className="w-4 h-4 mr-2" /> 
+                  {successMsg}
               </div>
           )}
           
@@ -674,6 +809,8 @@ ${finalHistoryBlock}
                         lang={lang}
                         mode={activeDoc?.mode || 'global'}
                         onModeChange={(val) => updateActiveDoc({ mode: val })}
+                        persona={activeDoc.persona || 'general'}
+                        onPersonaChange={(val) => updateActiveDoc({ persona: val })}
                       />
                   </div>
               </div>
@@ -731,6 +868,14 @@ ${finalHistoryBlock}
           result={result}
           doc={activeDoc}
           history={docHistory}
+          lang={lang}
+        />
+
+        <GithubModal
+          isOpen={showGithub}
+          onClose={() => setShowGithub(false)}
+          config={activeDoc?.githubConfig}
+          onSave={handleGithubSaveConfig}
           lang={lang}
         />
 

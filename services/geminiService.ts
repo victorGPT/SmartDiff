@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { AnalysisResult, Language, PatchPlan, TokenUsage } from "../types";
-import { TRANSLATIONS } from "../constants";
+import { AnalysisResult, Language, PatchPlan, TokenUsage, AnalysisPersona } from "../types";
+import { TRANSLATIONS, PERSONA_PROMPTS } from "../constants";
 
 // Initialize the client
 // API Key is guaranteed to be available in process.env.API_KEY
@@ -8,10 +8,17 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const MODEL_NAME = "gemini-2.5-flash";
 
-export const analyzeDiff = async (v1Text: string, v2Text: string, lang: Language, knownVersion?: string): Promise<AnalysisResult> => {
+export const analyzeDiff = async (
+  v1Text: string, 
+  v2Text: string, 
+  lang: Language, 
+  knownVersion?: string,
+  persona: AnalysisPersona = 'general'
+): Promise<AnalysisResult> => {
   
   const t = TRANSLATIONS[lang];
   const targetLangName = t.analysisPromptLang;
+  const personaInstruction = PERSONA_PROMPTS[persona];
 
   const responseSchema: Schema = {
     type: Type.OBJECT,
@@ -58,6 +65,9 @@ export const analyzeDiff = async (v1Text: string, v2Text: string, lang: Language
     
     Your task is to compare two documents (V1 and V2) and generate a structured changelog.
     
+    Target Audience / Persona: "${persona}"
+    Persona Instruction: ${personaInstruction}
+    
     Input V1 (Original):
     ${v1Text}
     
@@ -74,6 +84,7 @@ export const analyzeDiff = async (v1Text: string, v2Text: string, lang: Language
     4. Identify specific changes. For each change:
        - Categorize it (feat, fix, docs, etc.).
        - Provide a title and description in **${targetLangName}**.
+       - **Tone & Detail**: strictly follow the Persona Instruction above.
        - CRITICAL: Identify the start and end line numbers in V2 where this change is located/visible. Use the line numbers provided in the V2 input.
     
     IMPORTANT CONSTRAINT:

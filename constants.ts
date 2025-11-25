@@ -1,4 +1,4 @@
-import { ChangeType, Language } from "./types";
+import { ChangeType, Language, AnalysisPersona } from "./types";
 
 export const SAMPLE_V1 = `# SmartDiff 产品需求文档 (V1.0)
 
@@ -62,6 +62,14 @@ export const CHANGE_TYPE_DESCRIPTIONS: Record<Language, Record<string, string>> 
     [ChangeType.Style]: "Style - Changes that do not affect the meaning of the code (white-space, formatting, etc)",
     [ChangeType.Perf]: "Performance - A code change that improves performance"
   }
+};
+
+// Define specific prompts for different personas
+export const PERSONA_PROMPTS: Record<AnalysisPersona, string> = {
+  general: "Maintain a balanced, professional tone suitable for general project stakeholders.",
+  developer: "Focus on technical details, implementation specifics, parameter changes, and code structure. Use technical terminology.",
+  executive: "Focus on high-level business value, key features delivered, and risk reduction. Keep it concise and impact-oriented. Avoid overly technical jargon.",
+  public: "Focus on user-facing benefits, new capabilities, and improved experience. Use friendly, accessible language suitable for end-users."
 };
 
 // Used to separate document content from appended history logs
@@ -138,6 +146,13 @@ export const TRANSLATIONS = {
     opReplace: "替换内容",
     opDelete: "删除内容",
 
+    // Persona
+    labelPersona: "分析视角",
+    personaGeneral: "通用标准 (General)",
+    personaDeveloper: "极客开发 (Developer)",
+    personaExecutive: "管理汇报 (Executive)",
+    personaPublic: "用户公告 (Public)",
+
     // History
     btnHistoryClear: "清空历史",
     historySearchPlaceholder: "搜索历史记录...",
@@ -165,7 +180,22 @@ export const TRANSLATIONS = {
     shareHtmlDesc: "生成包含完整版本历史的单文件应用。支持离线查看任意版本对比。",
     btnCopySummary: "复制摘要",
     btnDownloadHtml: "下载 HTML 应用",
-    summaryCopied: "已复制！"
+    summaryCopied: "已复制！",
+
+    // GitHub
+    githubModalTitle: "GitHub 同步设置",
+    githubTokenLabel: "Personal Access Token (PAT)",
+    githubRepoLabel: "仓库信息 (Owner/Repo)",
+    githubBranchLabel: "分支 (Branch)",
+    githubPathLabel: "文件路径 (File Path)",
+    githubSave: "保存配置",
+    githubPush: "推送到 GitHub (Push)",
+    githubPull: "从 GitHub 拉取 (Pull)",
+    githubPushSuccess: "成功推送新版本到 GitHub！",
+    githubPullSuccess: "已从 GitHub 加载最新内容。",
+    githubError: "GitHub 操作失败，请检查配置或网络。",
+    githubPushConfirm: "提交信息 (Commit Message):",
+    githubPullConfirm: "确定要覆盖当前的 V1 内容吗？未保存的草稿将会丢失。"
   },
   en: {
     appTitle: "AI Automated Document Version Management",
@@ -234,6 +264,13 @@ export const TRANSLATIONS = {
     opReplace: "Replace",
     opDelete: "Delete",
 
+    // Persona
+    labelPersona: "Analysis Persona",
+    personaGeneral: "General Standard",
+    personaDeveloper: "Developer / Tech",
+    personaExecutive: "Executive Summary",
+    personaPublic: "Public Release",
+
     // History
     btnHistoryClear: "Clear History",
     historySearchPlaceholder: "Search history...",
@@ -261,6 +298,21 @@ export const TRANSLATIONS = {
     shareHtmlDesc: "Generate a standalone Single Page App. Interactive history and diffing.",
     btnCopySummary: "Copy Summary",
     btnDownloadHtml: "Download HTML App",
-    summaryCopied: "Copied!"
+    summaryCopied: "Copied!",
+
+    // GitHub
+    githubModalTitle: "GitHub Sync Settings",
+    githubTokenLabel: "Personal Access Token (PAT)",
+    githubRepoLabel: "Repo (Owner/Repo)",
+    githubBranchLabel: "Branch",
+    githubPathLabel: "File Path",
+    githubSave: "Save Config",
+    githubPush: "Push to GitHub",
+    githubPull: "Pull from GitHub",
+    githubPushSuccess: "Successfully pushed to GitHub!",
+    githubPullSuccess: "Loaded latest content from GitHub.",
+    githubError: "GitHub operation failed. Check config.",
+    githubPushConfirm: "Commit Message (Edit to confirm push):",
+    githubPullConfirm: "Overwrite current V1 with content from GitHub?"
   }
 };
