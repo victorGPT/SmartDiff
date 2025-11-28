@@ -3,6 +3,7 @@ import { Clock, RotateCcw, X, Search, Trash2, Filter } from 'lucide-react';
 import { HistoryRecord, Language } from '../types';
 import { TRANSLATIONS } from '../constants';
 import { Button } from './Button';
+import { storage } from '../services/storage';
 
 interface HistoryModalProps {
   isOpen: boolean;
@@ -19,14 +20,10 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, onR
 
   const loadHistory = () => {
     try {
-      const stored = localStorage.getItem('smartdiff_history');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        // Sort by timestamp desc
-        setHistory(parsed.sort((a: HistoryRecord, b: HistoryRecord) => b.timestamp - a.timestamp));
-      } else {
-        setHistory([]);
-      }
+      // Use storage service
+      const records = storage.getHistory();
+      // Sort by timestamp desc
+      setHistory(records.sort((a: HistoryRecord, b: HistoryRecord) => b.timestamp - a.timestamp));
     } catch (e) {
       console.error("Failed to load history", e);
       setHistory([]);
@@ -47,7 +44,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, onR
 
   const handleClearHistory = () => {
     if (window.confirm(t.historyConfirmClear)) {
-      localStorage.removeItem('smartdiff_history');
+      storage.clearHistory();
       setHistory([]);
     }
   };

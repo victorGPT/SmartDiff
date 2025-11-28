@@ -126,6 +126,10 @@ export const TRANSLATIONS = {
     analysisPromptLang: "Simplified Chinese",
     tokenUsage: "Token 消耗",
     
+    // View Options
+    viewSplit: "左右分栏",
+    viewUnified: "行内对比",
+
     // Smart Patch specific
     modeGlobal: "全局更新",
     modePatch: "智能补丁",
@@ -194,6 +198,7 @@ export const TRANSLATIONS = {
     githubPushSuccess: "成功推送新版本到 GitHub！",
     githubPullSuccess: "已从 GitHub 加载最新内容。",
     githubError: "GitHub 操作失败，请检查配置或网络。",
+    githubConflict: "检测到远程文件与本地 V1 不一致。有人可能已更新了文件。请先拉取最新更改。",
     githubPushConfirm: "提交信息 (Commit Message):",
     githubPullConfirm: "确定要覆盖当前的 V1 内容吗？未保存的草稿将会丢失。"
   },
@@ -243,6 +248,10 @@ export const TRANSLATIONS = {
     jsonCopied: "Copied",
     analysisPromptLang: "English",
     tokenUsage: "Token Usage",
+
+    // View Options
+    viewSplit: "Split",
+    viewUnified: "Unified",
 
     // Smart Patch specific
     modeGlobal: "Global Update",
@@ -312,6 +321,7 @@ export const TRANSLATIONS = {
     githubPushSuccess: "Successfully pushed to GitHub!",
     githubPullSuccess: "Loaded latest content from GitHub.",
     githubError: "GitHub operation failed. Check config.",
+    githubConflict: "Remote file content differs from local V1. Someone may have updated the file. Please Pull changes first.",
     githubPushConfirm: "Commit Message (Edit to confirm push):",
     githubPullConfirm: "Overwrite current V1 with content from GitHub?"
   }

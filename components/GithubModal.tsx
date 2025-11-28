@@ -4,6 +4,7 @@ import { GithubConfig, Language } from '../types';
 import { TRANSLATIONS } from '../constants';
 import { Button } from './Button';
 import { validateGithubToken } from '../services/githubService';
+import { storage } from '../services/storage';
 
 interface GithubModalProps {
   isOpen: boolean;
@@ -28,7 +29,8 @@ export const GithubModal: React.FC<GithubModalProps> = ({ isOpen, onClose, confi
   // Load initial values
   useEffect(() => {
     if (isOpen) {
-      const storedToken = localStorage.getItem('smartdiff_gh_token');
+      // Use storage service
+      const storedToken = storage.getGithubToken();
       if (storedToken) setToken(storedToken);
       
       if (config) {
@@ -68,7 +70,8 @@ export const GithubModal: React.FC<GithubModalProps> = ({ isOpen, onClose, confi
       path: path.trim()
     };
 
-    localStorage.setItem('smartdiff_gh_token', token);
+    // Use storage service
+    storage.saveGithubToken(token);
     onSave(token, newConfig);
     setIsValidating(false);
     onClose();

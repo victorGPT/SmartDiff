@@ -2,13 +2,13 @@ import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { AnalysisResult, Language, PatchPlan, TokenUsage, AnalysisPersona } from "../types";
 import { TRANSLATIONS, PERSONA_PROMPTS } from "../constants";
 
-// Initialize the client
-// API Key is guaranteed to be available in process.env.API_KEY
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 const MODEL_NAME = "gemini-2.5-flash";
 
+// Helper to create client instance on demand
+const getAIClient = (apiKey: string) => new GoogleGenAI({ apiKey });
+
 export const analyzeDiff = async (
+  apiKey: string,
   v1Text: string, 
   v2Text: string, 
   lang: Language, 
@@ -16,6 +16,7 @@ export const analyzeDiff = async (
   persona: AnalysisPersona = 'general'
 ): Promise<AnalysisResult> => {
   
+  const ai = getAIClient(apiKey);
   const t = TRANSLATIONS[lang];
   const targetLangName = t.analysisPromptLang;
   const personaInstruction = PERSONA_PROMPTS[persona];
@@ -132,7 +133,8 @@ export const analyzeDiff = async (
 /**
  * Step 1 of Smart Patch: Analyze intent, create a list of actions, and propose version
  */
-export const createPatchPlan = async (v1Text: string, patchFragment: string, lang: Language): Promise<PatchPlan> => {
+export const createPatchPlan = async (apiKey: string, v1Text: string, patchFragment: string, lang: Language): Promise<PatchPlan> => {
+  const ai = getAIClient(apiKey);
   const t = TRANSLATIONS[lang];
   const targetLangName = t.analysisPromptLang;
 
@@ -208,12 +210,14 @@ export const createPatchPlan = async (v1Text: string, patchFragment: string, lan
  * Step 2 of Smart Patch: Generate the full new document
  */
 export const generatePatchedDocument = async (
+  apiKey: string,
   v1Text: string, 
   patchFragment: string, 
   plan: PatchPlan, 
   targetVersion: string,
   lang: Language
 ): Promise<{ text: string, usage?: TokenUsage }> => {
+  const ai = getAIClient(apiKey);
   const today = new Date().toISOString().split('T')[0];
   
   // Convert actions array to string for prompt

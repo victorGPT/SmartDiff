@@ -11,12 +11,16 @@ import { ShareModal } from './components/ShareModal';
 import { GithubModal } from './components/GithubModal';
 import { analyzeDiff, createPatchPlan, generatePatchedDocument } from './services/geminiService';
 import { fetchFileFromGithub, pushFileToGithub } from './services/githubService';
+import { storage } from './services/storage';
 import { AnalysisResult, Language, AppMode, PatchPlan, HistoryRecord, Folder, SmartDocument, GithubConfig, AnalysisPersona } from './types';
 import { SAMPLE_V1, SAMPLE_V2, CHANGE_TYPE_DESCRIPTIONS, TRANSLATIONS, HISTORY_MARKER, AI_GUIDE_COMMENT } from './constants';
 import { Sparkles, Play, Code2, RotateCcw, SplitSquareHorizontal, Eye, Download, Languages, FileInput, FileText, Clock, Menu, PanelLeftClose, PanelLeftOpen, Share2, Github, CloudDownload, CloudUpload, CheckCircle2 } from 'lucide-react';
 
 // Helper for ID generation
 const generateId = () => Math.random().toString(36).substring(2, 11);
+
+// Get API Key from environment (Web) or future settings (VS Code)
+const API_KEY = process.env.API_KEY || '';
 
 const App: React.FC = () => {
   // --- State: File System ---
@@ -46,6 +50,7 @@ const App: React.FC = () => {
   
   // View Mode: 'edit' (default/source), 'diff' (comparison), 'preview' (markdown)
   const [viewMode, setViewMode] = useState<'edit' | 'diff' | 'preview'>('edit');
+  const [diffLayout, setDiffLayout] = useState<'split' | 'unified'>('split');
   const [lang, setLang] = useState<Language>('zh');
   const [docHistory, setDocHistory] = useState<HistoryRecord[]>([]);
 
@@ -56,18 +61,19 @@ const App: React.FC = () => {
 
   // --- Initialization & Migration ---
   useEffect(() => {
-    const storedFolders = localStorage.getItem('smartdiff_folders');
-    const storedDocs = localStorage.getItem('smartdiff_documents');
-    const storedActiveId = localStorage.getItem('smartdiff_active_id');
+    // Use Storage Service
+    const storedFolders = storage.getFolders();
+    const storedDocs = storage.getDocuments();
+    const storedActiveId = storage.getActiveDocId();
 
-    if (storedDocs) {
-      setFolders(storedFolders ? JSON.parse(storedFolders) : []);
-      setDocuments(JSON.parse(storedDocs));
+    if (storedDocs.length > 0) {
+      setFolders(storedFolders);
+      setDocuments(storedDocs);
       setActiveDocId(storedActiveId || null);
     } else {
       // MIGRATION: Check for legacy single-draft
-      const legacyV1 = localStorage.getItem('draft_v1');
-      const legacyTitle = localStorage.getItem('draft_title');
+      const legacyV1 = storage.getLegacyItem('draft_v1');
+      const legacyTitle = storage.getLegacyItem('draft_title');
       
       const defaultFolderId = generateId();
       const newFolder: Folder = {
@@ -81,9 +87,9 @@ const App: React.FC = () => {
         folderId: defaultFolderId,
         title: legacyTitle || t.feUntitledDoc,
         v1: legacyV1 || '',
-        v2: localStorage.getItem('draft_v2') || '',
-        patchText: localStorage.getItem('draft_patch') || '',
-        mode: (localStorage.getItem('draft_mode') as AppMode) || 'global',
+        v2: storage.getLegacyItem('draft_v2') || '',
+        patchText: storage.getLegacyItem('draft_patch') || '',
+        mode: (storage.getLegacyItem('draft_mode') as AppMode) || 'global',
         persona: 'general', // Default persona for migration
         createdAt: Date.now(),
         updatedAt: Date.now()
@@ -98,21 +104,20 @@ const App: React.FC = () => {
   // --- Persistence ---
   useEffect(() => {
     if (documents.length > 0) {
-       localStorage.setItem('smartdiff_folders', JSON.stringify(folders));
-       localStorage.setItem('smartdiff_documents', JSON.stringify(documents));
+       // Use Storage Service
+       storage.saveFolders(folders);
+       storage.saveDocuments(documents);
     }
-    if (activeDocId) {
-      localStorage.setItem('smartdiff_active_id', activeDocId);
-    }
+    storage.saveActiveDocId(activeDocId);
   }, [folders, documents, activeDocId]);
 
   // Load and filter history when sharing
   useEffect(() => {
     if (showShare) {
       try {
-        const stored = localStorage.getItem('smartdiff_history');
-        if (stored) {
-          const allHistory = JSON.parse(stored) as HistoryRecord[];
+        // Use Storage Service
+        const allHistory = storage.getHistory();
+        if (allHistory) {
           // Filter by docId if present, or try matching title if docId is missing (legacy support)
           const filtered = allHistory.filter(r => {
              if (activeDocId && r.docId === activeDocId) return true;
@@ -265,10 +270,10 @@ const App: React.FC = () => {
         docTitle: title || 'Untitled'
       };
       
-      const stored = localStorage.getItem('smartdiff_history');
-      const history = stored ? JSON.parse(stored) : [];
+      // Use Storage Service
+      const history = storage.getHistory();
       const newHistory = [newRecord, ...history].slice(0, 50); // Increase limit slightly
-      localStorage.setItem('smartdiff_history', JSON.stringify(newHistory));
+      storage.saveHistory(newHistory);
     } catch (e) {
       console.error("Failed to save history", e);
     }
@@ -292,7 +297,7 @@ const App: React.FC = () => {
 
   const handleGithubPull = async () => {
     if (!activeDoc?.githubConfig) return;
-    const token = localStorage.getItem('smartdiff_gh_token');
+    const token = storage.getGithubToken();
     if (!token) {
       setShowGithub(true);
       return;
@@ -321,7 +326,7 @@ const App: React.FC = () => {
 
   const handleGithubPush = async () => {
     if (!activeDoc?.githubConfig) return;
-    const token = localStorage.getItem('smartdiff_gh_token');
+    const token = storage.getGithubToken();
     if (!token) {
       setShowGithub(true);
       return;
@@ -335,12 +340,37 @@ const App: React.FC = () => {
         return;
     }
 
+    setIsSyncing(true);
+    setSuccessMsg(null);
+    setError(null);
+
+    // PRE-PUSH CONFLICT CHECK
+    try {
+      const { owner, repo, path, branch } = activeDoc.githubConfig;
+      // Fetch remote content to compare with local Base (V1)
+      const { content: remoteContent } = await fetchFileFromGithub(token, owner, repo, path, branch);
+      
+      const normalize = (str: string) => str.replace(/\r\n/g, '\n').trim();
+      
+      // If V1 is not empty and differs from remote, someone else pushed changes
+      if (activeDoc.v1 && normalize(remoteContent) !== normalize(activeDoc.v1)) {
+         setError(t.githubConflict);
+         setIsSyncing(false);
+         return;
+      }
+    } catch (err: any) {
+      // If file doesn't exist (404), it's a new file, proceed.
+      // If other error, let push handle it or stop.
+      if (err.status !== 404) {
+         console.warn("Pre-push check failed:", err);
+         // We continue but log warning, strict check might stop here
+      }
+    }
+
     // SMART COMMIT MESSAGE GENERATION
-    // If we have an analysis result, use it to craft a professional semantic commit message
     let defaultMessage = `docs: update ${activeDoc.title || 'document'} via SmartDiff`;
     
     if (result) {
-      // Format: docs: update to v1.1.0 - Added feature X, Fixed Y
       const actionSummary = result.changes.length > 0 
         ? result.changes.map(c => c.title).join(', ').slice(0, 50) + (result.changes.map(c => c.title).join(', ').length > 50 ? '...' : '')
         : 'General updates';
@@ -349,13 +379,11 @@ const App: React.FC = () => {
     }
 
     // Allow user to edit the commit message
-    // Using default message as the default value in prompt
+    setIsSyncing(false); // Pause sync spinner for prompt
     const userMessage = window.prompt(t.githubPushConfirm, defaultMessage);
     if (userMessage === null) return; // Cancelled
 
-    setIsSyncing(true);
-    setSuccessMsg(null);
-    setError(null);
+    setIsSyncing(true); // Resume
     try {
       const { owner, repo, path, branch } = activeDoc.githubConfig;
       
@@ -406,8 +434,8 @@ const App: React.FC = () => {
         const cleanV1 = stripMetadata(activeDoc.v1);
         const cleanV2 = stripMetadata(activeDoc.v2);
 
-        // PASS PERSONA
-        const analysis = await analyzeDiff(cleanV1, cleanV2, lang, undefined, activeDoc.persona || 'general');
+        // PASS API_KEY AND PERSONA
+        const analysis = await analyzeDiff(API_KEY, cleanV1, cleanV2, lang, undefined, activeDoc.persona || 'general');
         setResult(analysis);
         setStep('result');
         saveToHistory(analysis, cleanV2, activeDoc.title);
@@ -432,7 +460,7 @@ const App: React.FC = () => {
       setIsAnalyzing(true);
       try {
         const cleanV1 = stripMetadata(activeDoc.v1);
-        const plan = await createPatchPlan(cleanV1, activeDoc.patchText, lang);
+        const plan = await createPatchPlan(API_KEY, cleanV1, activeDoc.patchText, lang);
         setPatchPlan(plan);
         setShowPatchPreview(true);
       } catch (err) {
@@ -454,14 +482,15 @@ const App: React.FC = () => {
       const inheritedHistory = extractHistory(activeDoc.v1);
       
       // Generate returns { text, usage }
-      const { text: newV2, usage: generationUsage } = await generatePatchedDocument(cleanV1ForGen, activeDoc.patchText, patchPlan, targetVersion, lang);
+      // PASS API_KEY
+      const { text: newV2, usage: generationUsage } = await generatePatchedDocument(API_KEY, cleanV1ForGen, activeDoc.patchText, patchPlan, targetVersion, lang);
 
       // Ensure AI Guide is present in the raw generated text
       const v2WithGuide = ensureAiGuide(newV2);
       const cleanV2 = stripMetadata(v2WithGuide); 
       
-      // PASS PERSONA
-      const analysis = await analyzeDiff(cleanV1ForGen, cleanV2, lang, targetVersion, activeDoc.persona || 'general');
+      // PASS API_KEY AND PERSONA
+      const analysis = await analyzeDiff(API_KEY, cleanV1ForGen, cleanV2, lang, targetVersion, activeDoc.persona || 'general');
       
       setResult(analysis);
       saveToHistory(analysis, cleanV2, activeDoc.title);
@@ -837,6 +866,8 @@ ${finalHistoryBlock}
                   activeChangeId={activeChangeId} 
                   highlightLines={highlightLines}
                   viewMode={viewMode}
+                  diffLayout={diffLayout}
+                  onLayoutChange={setDiffLayout}
                   lang={lang}
                 />
               </div>
